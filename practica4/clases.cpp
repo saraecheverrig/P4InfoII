@@ -217,30 +217,50 @@ void TablaEnrutamiento::vaciarCaminosCortos(){
 }
 
 
-
-
 void menu(){
-    vector <string> letras = {"A","B","C","D"};
-    Enrutador A(0,"A"),B(1,"B"),C(2,"C"),D(3,"D"),A2, A3,A4,A5;
-    vector  <Enrutador * > Enrutadores= {&A,&B,&C,&D}, restantes = {&A2,&A3,&A4,&A5}, total = {&A,&B,&C,&D,&A2,&A3,&A4,&A5};
+    vector<string> letras = {"A","B","C","D"};
+    Enrutador A(0,"A"), B(1,"B"), C(2,"C"), D(3,"D"), A2, A3, A4, A5;
+    vector<Enrutador*> Enrutadores = {&A,&B,&C,&D};
+    vector<Enrutador*> restantes  = {&A2,&A3,&A4,&A5};
+    vector<Enrutador*> total      = {&A,&B,&C,&D,&A2,&A3,&A4,&A5};
     Enrutador *& punteroEnrut = restantes.back();
 
     TablaEnrutamiento rut;
-    //Anexo rutas por defecto
-    A.agregarRuta(B.getIndex(),4); A.agregarRuta(C.getIndex(),10);
-    B.agregarRuta(A.getIndex(),4); B.agregarRuta(D.getIndex(),1);
-    C.agregarRuta(A.getIndex(),10); C.agregarRuta(D.getIndex(),2);
-    D.agregarRuta(C.getIndex(),2); D.agregarRuta(B.getIndex(),1);
-    //Anexo de rutas conocidas a la tabla
-    rut.setEnrutador(*A.retornarConexionesVecinas(),A.getIndex());
-    rut.setEnrutador(*B.retornarConexionesVecinas(),B.getIndex());
-    rut.setEnrutador(*C.retornarConexionesVecinas(),C.getIndex());
-    rut.setEnrutador(*D.retornarConexionesVecinas(),D.getIndex());
-    //Mostrar enrutadores en la tabla de enrutamiento
-    //rut.mostrarEnrutadores(letras);
-    //Establecer tablas de enrutamiento para cada enrutador
+
+    // Cargar topología desde archivo en lugar de definir manualmente
+    // redDesdeTexto llenará Enrutadores, letras y restantes usando "total"
+    generarRedAleatoria(4);
+
+    redDesdeTexto(&Enrutadores, &letras, &restantes, &total);
+    // Reconstruir 'letras' a partir de Enrutadores para que coincida con la matriz
+    letras.clear();
+    for (auto e : Enrutadores) {
+        letras.push_back(e->getId());
+    }
+
+    // Reconstruir la TablaEnrutamiento con la información actual y recalcular
+    // (el resto del código ya hace rut.setEnrutador / rut.minDist / actualizarTablas)
+    rut = TablaEnrutamiento();
+    for (auto enrut : Enrutadores) {
+        rut.setEnrutador(*enrut->retornarConexionesVecinas(), enrut->getIndex());
+    }
     rut.minDist();
-    actualizarTablas(rut,Enrutadores);
+    actualizarTablas(rut, Enrutadores);
+    setTablas(&Enrutadores, rut);
+
+    if (Enrutadores.empty()){
+        cout << "No se cargó ninguna topología desde Conexiones.txt o el archivo está vacío.\n";
+        // La red queda vacía; el menú seguirá permitiendo agregar enrutadores manualmente.
+    } else {
+        // Rellenar la TablaEnrutamiento con las conexiones leídas
+        for (auto enrut : Enrutadores){
+            rut.setEnrutador(*enrut->retornarConexionesVecinas(), enrut->getIndex());
+        }
+        // Calcular caminos y actualizar tablas locales
+        rut.minDist();
+        actualizarTablas(rut, Enrutadores);
+        setTablas(&Enrutadores, rut);
+    }
 
     int opcion = 0;
     while (opcion != 5){
@@ -260,22 +280,28 @@ void menu(){
             for(auto enrut : restantes){
                 enrut->pushBackConexionesTabla();
             }
-            punteroEnrut = restantes.back();
-            agregar(&letras, &Enrutadores, *punteroEnrut);
-            rut.aggBackConexiones();
-            rut.setEnrutador(*punteroEnrut->retornarConexionesVecinas(),punteroEnrut->getIndex());
-            rut.setConexion(*punteroEnrut->retornarConexionesVecinas(),punteroEnrut->getIndex());
-            Enrutadores.push_back(punteroEnrut);
-            restantes.pop_back();
-            rut.aumentarCantEnrutadores();
-            rut.minDist();
-            actualizarTablas(rut,Enrutadores);
-            setTablas(&Enrutadores, rut);
+            // Actualizar puntero al siguiente disponible y usarlo para agregar
+            if (!restantes.empty()){
+                punteroEnrut = restantes.back();
+                agregar(&letras, &Enrutadores, *punteroEnrut);
+                rut.aggBackConexiones();
+                rut.setEnrutador(*punteroEnrut->retornarConexionesVecinas(), punteroEnrut->getIndex());
+                rut.setConexion(*punteroEnrut->retornarConexionesVecinas(), punteroEnrut->getIndex());
+                Enrutadores.push_back(punteroEnrut);
+                restantes.pop_back();
+                rut.aumentarCantEnrutadores();
+                rut.minDist();
+                actualizarTablas(rut, Enrutadores);
+                setTablas(&Enrutadores, rut);
+            } else {
+                cout << "No hay enrutadores disponibles para agregar (restantes vacío).\n";
+            }
             break;
         case 2:
             eliminar(&Enrutadores, &letras, &rut, &restantes);
+            // después de eliminar, recalcular y actualizar
             rut.minDist();
-            actualizarTablas(rut,Enrutadores);
+            actualizarTablas(rut, Enrutadores);
             setTablas(&Enrutadores, rut);
             break;
         case 3:
@@ -293,9 +319,8 @@ void menu(){
             break;
         }
     }
-
-
 }
+
 
 void eliminar(vector<Enrutador *> *Enrutadores, vector<string> *letras, TablaEnrutamiento *rut,vector<Enrutador *> *restantes){
     vector <Enrutador *>:: iterator iteradorEnrut = (*Enrutadores).begin();
@@ -407,71 +432,190 @@ void mostrarCosto(vector<Enrutador *> *Enrutadores){
     }
 }
 
-
-
-
-
-
-
-
-
-
-
 void redDesdeTexto(vector<Enrutador *> *Enrutadores, vector<string> *letras,
                    vector<Enrutador *> *restantes, vector<Enrutador *> *total) {
     ifstream archivo;
+    Enrutadores->clear();
+    letras->clear();
+    restantes->clear();
     vector<Enrutador *> temporales;
-    Enrutadores->clear(), letras->clear(),restantes->clear();
-    int indice = 0;
-    vector <string> lineas;
-    Enrutador *& punteroEnrut = total->back();
+    vector<string> lineas;
+
     try {
-        archivo.open("Conexiones.txt", ios::in);
-    } catch (const exception &) {
+        archivo.open("ConexionesAle.txt", ios::in);
+        if (!archivo.is_open()) {
+            cout << "\nNo ha sido posible abrir el archivo Conexiones.txt\n";
+            return;
+        }
+    } catch (...) {
         cout << "\nNo ha sido posible abrir el archivo\n";
-        return ;
+        return;
     }
-    while(!archivo.eof()){
-        string temp, substring;
-        getline(archivo,temp,'\n');
-        punteroEnrut = total->back();
+
+    string temp;
+    while (std::getline(archivo, temp)) {
+        // quitar '\r' si existe (Windows)
+        if (!temp.empty() && temp.back() == '\r') temp.pop_back();
+        // trim simple
+        size_t start = temp.find_first_not_of(" \t");
+        if (start == string::npos) continue;
+        size_t end = temp.find_last_not_of(" \t");
+        string line = temp.substr(start, end - start + 1);
+        if (!line.empty()) lineas.push_back(line);
+    }
+    archivo.close();
+
+    // Crear enrutadores temporales (sacando objetos de 'total')
+    int indice = 0;
+    for (const auto &line : lineas) {
+        if (total->empty()) {
+            cout << "Error: no hay suficientes objetos Enrutador en 'total' para cubrir las líneas del archivo\n";
+            // limpiar temporales ya usados: devolverlos a `total` podría ser una mejora, pero aquí abortamos.
+            return;
+        }
+        Enrutador *punteroEnrut = total->back();
         total->pop_back();
+        // establecer id e índice
+        size_t colon = line.find(':');
+        if (colon == string::npos || colon == 0) {
+            cout << "Línea con formato inválido (se esperaba 'ID:lista'): " << line << "\n";
+            return;
+        }
+        string id = line.substr(0, colon);
+        // trim id
+        size_t idStart = id.find_first_not_of(" \t");
+        size_t idEnd = id.find_last_not_of(" \t");
+        string idTrim = (idStart == string::npos) ? id : id.substr(idStart, idEnd - idStart + 1);
+
+        punteroEnrut->setId(idTrim);
+        punteroEnrut->setIndex(indice);
+        letras->push_back(idTrim);
+
         temporales.push_back(punteroEnrut);
-        substring = temp[0];
-        punteroEnrut->setId(substring), letras->push_back(substring), punteroEnrut->setIndex(indice);
         indice++;
-        substring = temp.substr(3,temp.size()-3);
-        lineas.push_back( substring);
     }
-    for (auto &linea: lineas){
-        punteroEnrut = *temporales.begin();
-        string substring2, substring, nombre;
-        for (int  j = 0; j < ceil(linea.size()/4 ); j++){    //Cant de bloques
-            substring2 = linea.substr(4*j,4);
-            for (auto caracter : substring2){
-                if(isdigit(caracter)) substring += caracter;       //substr asume el costo en string
-                else if(isalpha(caracter)) nombre += caracter;
+
+    // Para cada línea (mismo orden), procesar su parte de conexiones
+    for (size_t idx = 0; idx < lineas.size(); ++idx) {
+        Enrutador *origen = temporales[idx];
+        const string &line = lineas[idx];
+        size_t colon = line.find(':');
+        if (colon == string::npos) continue;
+        string connections = (colon + 1 < line.size()) ? line.substr(colon + 1) : string();
+        // separar por comas
+        size_t pos = 0;
+        while (pos < connections.size()) {
+            size_t comma = connections.find(',', pos);
+            string token = (comma == string::npos) ? connections.substr(pos) : connections.substr(pos, comma - pos);
+            pos = (comma == string::npos) ? connections.size() : comma + 1;
+
+            // trim token
+            size_t tstart = token.find_first_not_of(" \t");
+            if (tstart == string::npos) continue;
+            size_t tend = token.find_last_not_of(" \t");
+            token = token.substr(tstart, tend - tstart + 1);
+            if (token.empty()) continue;
+
+            // separar nombre y número
+            string nombre; string numero;
+            for (char ch : token) {
+                if (isalpha((unsigned char)ch)) nombre.push_back(ch);
+                else if (isdigit((unsigned char)ch) || ch == '-') numero.push_back(ch);
             }
-            for (auto &enrut : temporales){
-                if (enrut->getId() == nombre){
-                    punteroEnrut->agregarRuta(enrut->getIndex(),stoi(substring));
-                    vector <Enrutador *>:: iterator iteradorEnrut = (temporales).begin() + enrut->getIndex() ;
-                    temporales.erase(iteradorEnrut);
-                    Enrutadores->push_back(punteroEnrut);
-                }
+            if (nombre.empty() || numero.empty()) continue;
+
+            // buscar el enrutador destino en temporales (NO eliminarlo)
+            Enrutador *dest = nullptr;
+            for (auto cand : temporales) {
+                if (cand->getId() == nombre) { dest = cand; break; }
             }
+            if (!dest) {
+                cout << "Advertencia: destino '" << nombre << "' no encontrado entre los routers leídos.\n";
+                continue;
+            }
+
+            int costo = 0;
+            try { costo = stoi(numero); } catch (...) {
+                cout << "Costo inválido en token: " << token << "\n";
+                continue;
+            }
+            origen->agregarRuta(dest->getIndex(), costo);
         }
     }
-    for (auto enrut : *total){
-        restantes->push_back(enrut), total->pop_back();
+
+    // Agregar todos los temporales al vector final Enrutadores (manteniendo orden)
+    for (auto p : temporales) Enrutadores->push_back(p);
+
+    // Mover lo que quede en total a restantes
+    while (!total->empty()) {
+        restantes->push_back(total->back());
+        total->pop_back();
     }
 }
 
-/*
-redDesdeTexto(&Enrutadores,&letras, &restantes, &total);
-for (auto enrut : Enrutadores){
-    rut.setEnrutador(*enrut->retornarConexionesVecinas(),enrut->getIndex());
+void generarRedAleatoria(int N, double p, int minCost, int maxCost, const string &filename) {
+    if (N <= 0) return;
+    if (minCost > maxCost) swap(minCost, maxCost);
+
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_real_distribution<> prob(0.0, 1.0);
+    uniform_int_distribution<> cost(minCost, maxCost);
+
+    vector<string> names;
+    for (int i = 0; i < N; ++i) {
+        if (i < 26) names.push_back(string(1, char('A' + i)));
+        else names.push_back("A" + to_string(i - 26));
+    }
+
+    vector<vector<int>> adj(N, vector<int>(N, -1));
+    for (int i = 0; i < N; ++i) adj[i][i] = 0;
+
+    for (int i = 0; i < N; ++i) {
+        for (int j = i + 1; j < N; ++j) {
+            if (prob(gen) <= p) {
+                int c = cost(gen);
+                adj[i][j] = c;
+                adj[j][i] = c;
+            }
+        }
+    }
+
+    for (int i = 0; i < N; ++i) {
+        bool tieneVecino = false;
+        for (int j = 0; j < N; ++j) if (j != i && adj[i][j] >= 0) { tieneVecino = true; break; }
+        if (!tieneVecino) {
+            int j = i;
+            while (j == i) j = gen() % N;
+            int c = cost(gen);
+            adj[i][j] = c;
+            adj[j][i] = c;
+        }
+    }
+
+    for (int i = 0; i + 1 < N; ++i) {
+        if (adj[i][i+1] < 0) {
+            int c = cost(gen);
+            adj[i][i+1] = c;
+            adj[i+1][i] = c;
+        }
+    }
+
+    ofstream ofs(filename, ios::out);
+    if (!ofs.is_open()) return;
+
+    for (int i = 0; i < N; ++i) {
+        ofs << names[i] << ":";
+        bool first = true;
+        for (int j = 0; j < N; ++j) {
+            if (i == j) continue;
+            if (adj[i][j] >= 0) {
+                if (!first) ofs << ",";
+                ofs << names[j] << adj[i][j];
+                first = false;
+            }
+        }
+        ofs << "\n";
+    }
+    ofs.close();
 }
-rut.minDist();
-actualizarTablas(rut,Enrutadores);
-*/

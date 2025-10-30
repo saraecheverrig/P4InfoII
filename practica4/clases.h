@@ -2,8 +2,13 @@
 #define CLASES_H
 #include <string>
 #include "funciones.h"
-#include <fstream>
 #include <cmath>
+#include <random>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <iostream>
+#include <algorithm>
 
 typedef vector<int> vect;
 
@@ -27,7 +32,6 @@ public:
     void vaciarCaminosCortos();
     void setConexion(vect &enrutador,const int pos);
 };
-
 
 
 //Clase Enrutador
@@ -59,9 +63,7 @@ public:
 };
 
 
-
 //void actualizarTablas(TablaEnrutamiento tabla, vector <Enrutador> enrutadores);
-
 
 
 void menu();
@@ -71,5 +73,7 @@ void elimRutaRestantes(vector<Enrutador *> *restantes);
 void setTablas(vector<Enrutador *> *Enrutadores,TablaEnrutamiento rut);
 void mostrarCosto(vector<Enrutador *> *Enrutadores);
 void redDesdeTexto(vector<Enrutador *> *Enrutadores,vector<string> *letras, vector<Enrutador *> *restantes, vector<Enrutador *> *total);
+void generarRedAleatoria(int N, double p = 0.6, int minCost = 1, int maxCost = 10, const string &filename = "ConexionesAle.txt");
+
 
 #endif // CLASES_H
